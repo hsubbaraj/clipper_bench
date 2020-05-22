@@ -12,6 +12,8 @@ note: extra_container_kwargs={'cpuset_cpus':'0-35'}) 0-35 available cpus on that
 
 
 5. write predict function (ie https://github.com/hsubbaraj/clipper_bench/blob/master/incept_setup.py)
+Note: num_replicas, batch_size need to be set
+also include pyarrow in packages_to_install
 
 
 6. write client (ie https://github.com/hsubbaraj/clipper_bench/blob/master/parallel_bench.py)
