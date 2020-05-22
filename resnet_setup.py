@@ -2,6 +2,7 @@ import torch
 import torchvision
 import numpy as np
 from PIL import Image
+from torchvision import transforms
 import os
 import io
 import base64
@@ -14,7 +15,7 @@ import clipper_admin.deployers.pytorch as pytorch_deployer
 
 
 
-resnet101 = torchvision.models.resnet101(pretrained=True)
+resnet101 = torchvision.models.resnet18(pretrained=True)
 transform_pipeline = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
@@ -25,9 +26,12 @@ transform_pipeline = transforms.Compose([
     )])
 
 def resnet_predict(model, inputs):
+  assert torch.cuda.is_available()
+  model.cuda()
   model.eval()
   pil_images = [Image.open(io.BytesIO(i) for i in inputs)]
   input_tensor = torch.cat([self.preprocessor(i).unsqueeze(0) for i in pil_images])
+  input_tensor = input_tensor.cuda()
   with torch.no_grad():
     output_tensor = self.model(input_tensor)
 
@@ -69,7 +73,7 @@ def resnet_predict(model, inputs):
 def setup_clipper():
   app_name = 'resnet101-app'
   model_name = 'resnet101-model'
-  clipper_conn = ClipperConnection(DockerContainerManager())
+  clipper_conn = ClipperConnection(DockerContainerManager(gpu=True))
   clipper_conn.connect()
   
   pytorch_deployer.deploy_pytorch_model(clipper_conn=clipper_conn,
@@ -78,7 +82,9 @@ def setup_clipper():
           input_type='bytes',
           func=resnet_predict,
           pytorch_model=resnet101,
-          pkgs_to_install=['pillow', 'torch', 'torchvision'])
+          num_replicas=1,
+          batch_size=1,
+          pkgs_to_install=['prometheus_client', 'zmq', 'pillow', 'torch', 'torchvision'])
 
   clipper_conn.register_application(name=app_name,
           input_type="bytes",
