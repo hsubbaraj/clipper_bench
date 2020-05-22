@@ -1,8 +1,8 @@
 import torch
 import torchvision
-import numpy as np
-from PIL import Image
 from torchvision import transforms
+from PIL import Image
+import numpy as np
 import os
 import io
 import base64
@@ -14,8 +14,7 @@ import clipper_admin.deployers.pytorch as pytorch_deployer
 
 
 
-
-resnet101 = torchvision.models.resnet18(pretrained=True)
+resnet101 = torchvision.models.resnet101(pretrained=True)
 transform_pipeline = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
@@ -29,44 +28,20 @@ def resnet_predict(model, inputs):
   assert torch.cuda.is_available()
   model.cuda()
   model.eval()
-  pil_images = [Image.open(io.BytesIO(i) for i in inputs)]
-  input_tensor = torch.cat([self.preprocessor(i).unsqueeze(0) for i in pil_images])
+  start = time.time()
+  pil_images = [Image.open(io.BytesIO(i)).convert("RGB") for i in inputs]
+  input_tensor = torch.cat([transform_pipeline(i).unsqueeze(0) for i in pil_images])
   input_tensor = input_tensor.cuda()
+  end1 = time.time()
   with torch.no_grad():
-    output_tensor = self.model(input_tensor)
-
+    out = model(input_tensor)
+  end2 = time.time()
+  print("transform: ", end1-start)
+  print("model: ", end2-end1)
   _, indices = torch.sort(out, descending=True)
-  percentage = torch.nn.functional.softmax(out, dim=1)[0] * 100
-  p_2 = percentage.detach().numpy()
-  print("indices.shape: ", indices.shape)
-  print("p2.shape: ", p2.shape)
-  conf = p_2[indices[0][0]].item()
-  idx = indices.data.numpy()[0][0].item()
-  print("conf: ", str(conf))
-  print("idx: ", idx)
-  return [[0, 0] for i in inputs]
-
-  def _predict_one(one_input_arr):
-    
-    model.eval()
-    img = Image.open(io.BytesIO(one_input_arr))
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    img = transform_pipeline(img)
-    img = img.unsqueeze(0)
-    out = model(img)
-    print("After model runs")
-    _, indices = torch.sort(out, descending=True)
-    percentage = torch.nn.functional.softmax(out, dim=1)[0] * 100
-    p_2 = percentage.detach().numpy()
-    conf = p_2[indices[0][0]].item()
-    if conf > 85:
-      x = 1
-    else:
-      x = 0
-
-    return [one_input_arr, indices.data.numpy()[0][0].item(),  p_2[indices[0][0]].item(), x]
-  return [_predict_one(i) for i in inputs]
+  percentage = torch.nn.functional.softmax(out, dim=1)
+  p_2 = percentage.detach().cpu().numpy()
+  return [[indices.detach().cpu().numpy()[idx][0].item(), p_2[idx][indices[idx][0]].item()*100] for idx in range(len(inputs))]
 
 
 
@@ -75,16 +50,16 @@ def setup_clipper():
   model_name = 'resnet101-model'
   clipper_conn = ClipperConnection(DockerContainerManager(gpu=True))
   clipper_conn.connect()
-  
+
   pytorch_deployer.deploy_pytorch_model(clipper_conn=clipper_conn,
           name=model_name,
           version='1',
           input_type='bytes',
           func=resnet_predict,
           pytorch_model=resnet101,
-          num_replicas=1,
           batch_size=1,
-          pkgs_to_install=['prometheus_client', 'zmq', 'pillow', 'torch', 'torchvision'])
+          num_replicas=1,
+          pkgs_to_install=['pillow', 'torch', 'torchvision'])
 
   clipper_conn.register_application(name=app_name,
           input_type="bytes",
@@ -99,5 +74,3 @@ def setup_clipper():
 
 
 setup_clipper()
-
-
