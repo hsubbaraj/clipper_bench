@@ -1,0 +1,6 @@
+sudo apt update
+sudo apt install docker.io
+
+sudo gpasswd -a $USER docker
+newgrp docker
+sudo service docker restart
