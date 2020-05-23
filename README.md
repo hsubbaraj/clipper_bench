@@ -4,7 +4,7 @@ For each model, deploy clipper on a provisioned node:
 2. pip3 install -e clipper/clipper_admin/
 
 3. modify https://github.com/ucbrise/clipper/blob/develop/clipper_admin/clipper_admin/docker/docker_container_manager.py#L395
-to add "OMP_NUM_THREADS": 4 as dict entry
+to add "OMP_NUM_THREADS": num_threads as dict entry
 
 4. start clipper ie https://github.com/hsubbaraj/clipper_bench/blob/master/utils/start_clipper.py
 note: extra_container_kwargs={'cpuset_cpus':'0-35'}) 0-35 available cpus on that node
